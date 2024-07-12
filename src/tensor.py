@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 from typing import Callable, TypeAlias
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from .operations import Add, Divide, MatrixMultiply, Multiply, Subtract
+from .operations import Add, Divide, MatrixMultiply, Multiply, Operation, Subtract
 
 Scalar: TypeAlias = int | float
 
@@ -17,6 +18,7 @@ class Tensor:
         grad: The gradient of the tensor.
         require_grad: Indicates whether the tensor requires
             gradient computation.
+        _creator_operation: The operation that create this tensor.
         _backward_fn: The function to compute the gradient backward pass.
             This depends on how the tensor was created.
     """
@@ -24,6 +26,7 @@ class Tensor:
     data: NDArray
     grad: ArrayLike | None
     require_grad: bool
+    _creator_operation: Operation | None
     _backward_fn: Callable[[ArrayLike], None] | None
 
     def __init__(self, data: ArrayLike, require_grad=False) -> None:
@@ -37,6 +40,7 @@ class Tensor:
         """
         self.data = np.array(data)
         self.grad = None
+        self._creator_operation = None
         self.require_grad = require_grad
         self._backward_fn = None
 

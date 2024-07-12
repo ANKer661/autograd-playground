@@ -44,6 +44,7 @@ class Operation(ABC):
                         tensor.backward(grad)
 
             result._backward_fn = backward_fn
+            result._creator_operation = self
 
         return result
 
