@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from typing import Callable, TypeAlias
+from uuid import uuid4
 
+import networkx as nx
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from .operations import Add, Divide, MatrixMultiply, Multiply, Operation, Subtract
@@ -18,6 +21,7 @@ class Tensor:
         grad: The gradient of the tensor.
         require_grad: Indicates whether the tensor requires
             gradient computation.
+        uid: A unique id that represent the tensor.
         _creator_operation: The operation that create this tensor.
         _backward_fn: The function to compute the gradient backward pass.
             This depends on how the tensor was created.
@@ -25,6 +29,7 @@ class Tensor:
 
     data: NDArray
     grad: ArrayLike | None
+    uid: str
     require_grad: bool
     _creator_operation: Operation | None
     _backward_fn: Callable[[ArrayLike], None] | None
@@ -40,8 +45,9 @@ class Tensor:
         """
         self.data = np.array(data)
         self.grad = None
-        self._creator_operation = None
+        self.uid = str(uuid4())
         self.require_grad = require_grad
+        self._creator_operation = None
         self._backward_fn = None
 
     def backward(self, grad: ArrayLike | None = None) -> None:
@@ -135,3 +141,86 @@ class Tensor:
             other (Tensor): another Tensor as right operand
         """
         return MatrixMultiply()(self, other)
+
+
+def visualize(tensor: Tensor):
+    G = nx.DiGraph()
+    visited = set()
+    node_labels = {}
+
+    def build_computation_graph(tensor: Tensor) -> None:
+        """
+        Recursively builds a computation graph starting from the
+        given tensor.
+
+        Args:
+            tensor (Tensor): The starting tensor for building the graph
+        """
+        if tensor.uid in visited:
+            return
+
+        visited.add(tensor.uid)
+        G.add_node(tensor.uid)
+        node_labels[tensor.uid] = str(
+            np.array2string(tensor.data, prefix="  ", separator=", ")
+        )
+
+        if tensor._creator_operation:
+            inputs = tensor._creator_operation.inputs
+            for input_tensor in inputs:
+                build_computation_graph(input_tensor)
+                G.add_edge(
+                    input_tensor.uid,
+                    tensor.uid,
+                    label=tensor._creator_operation.__class__.__name__,
+                )
+
+    build_computation_graph(tensor)
+
+    fig, ax = plt.subplots(figsize=(16, 10), dpi=100)
+    pos = nx.kamada_kawai_layout(G)
+    nx.draw(
+        G,
+        pos,
+        with_labels=False,
+        node_color="lightblue",
+        node_size=5000,
+        arrows=True,
+        ax=ax,
+    )
+    nx.draw_networkx_labels(
+        G,
+        pos,
+        node_labels,
+        font_size=8,
+        font_weight="bold",
+        ax=ax,
+    )
+    edge_labels = nx.get_edge_attributes(G, "label")
+    nx.draw_networkx_edge_labels(G, pos, edge_labels)
+    ax.set_title("Computation Graph")
+    ax.axis("off")
+    ax.margins(0.1, 0.05)
+
+    return fig, ax
+
+
+if __name__ == "__main__":
+    a_data = np.array([[1, 2, 3], [3, 1, 4]])
+    b_data = np.array([[2, 3, 4], [1, 7, 5]])
+    a = Tensor(a_data, require_grad=True)
+    b = Tensor(b_data, require_grad=True)
+    c = 3 * a + b
+
+    constant1_data = np.array([2, 3, 4])  # broadcast: (3,) -> (2, 3)
+    constant1 = Tensor(constant1_data, require_grad=False)
+    d = c * constant1
+
+    constant2_data = np.array([[2, 2], [3, 9], [4, 7]])
+    constant2 = Tensor(constant2_data, require_grad=False)
+    e = d @ constant2
+
+    fig, ax = visualize(e)
+
+    fig.savefig(r"./tests/figs/test.png")
+    plt.show()
