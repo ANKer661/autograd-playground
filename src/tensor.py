@@ -194,9 +194,27 @@ def visualize(tensor: Tensor) -> tuple[Figure, Axes]:
 
     build_computation_graph(tensor)
 
-    # visualization of the computaion graph
-    fig, ax = plt.subplots(figsize=(5, 20), dpi=300)
-    pos = nx.bfs_layout(G.reverse(), tensor.uid, align="horizontal")
+    # calculate the size of the figure
+    pos: dict = nx.bfs_layout(G.reverse(), tensor.uid, align="horizontal", scale=(2, 4))
+    pos_array = np.array(list(pos.values()))
+    x_min, y_min = pos_array.min(axis=0)
+    x_max, y_max = pos_array.max(axis=0)
+    width = x_max - x_min
+    height = y_max - y_min
+    margin = 0.1
+    fig_width = width + 2 * margin
+    fig_height = height + 2 * margin
+
+    # create fig and ax, adjust subplot position
+    fig, ax = plt.subplots(figsize=(fig_width * 5, fig_height * 5), dpi=300)
+    plt.subplots_adjust(left=0.02, right=0.98, top=0.9, bottom=0.02)
+
+    # some adaptive parameters
+    node_size = min(
+        10_000, max(3000, 70_000 / (len(G) ** 0.9))
+    )  # 3000 < node_size < 10_000
+    arrowsize = node_size // 250
+    font_size = node_size // 250
 
     # draw nodes and edges
     nx.draw(
@@ -205,25 +223,26 @@ def visualize(tensor: Tensor) -> tuple[Figure, Axes]:
         with_labels=False,
         node_color="lightblue",
         node_shape="s",
-        node_size=3000,
+        node_size=node_size,
         arrows=True,
-        arrowsize=20,
+        arrowsize=arrowsize,
         ax=ax,
     )
+
     # draw node labels
     nx.draw_networkx_labels(
         G,
         pos,
         node_labels,
-        font_size=10,
+        font_size=font_size,
         font_weight="bold",
         ax=ax,
     )
 
-    ax.set_title("Computation Graph", fontsize=20)
+    # set title and margins
+    ax.set_title("Computation Graph", fontsize=2 * font_size)
     ax.axis("off")
     ax.margins(0.1, 0.05)
-    ax.autoscale(tight=True, axis="y")
 
     return fig, ax
 
@@ -233,7 +252,7 @@ if __name__ == "__main__":
     b_data = np.array([[2, 3, 4], [1, 7, 5]])
     a = Tensor(a_data, require_grad=True)
     b = Tensor(b_data, require_grad=True)
-    c = 3 * a + b
+    c = a + b
 
     constant1_data = np.array([2, 3, 4])  # broadcast: (3,) -> (2, 3)
     constant1 = Tensor(constant1_data, require_grad=False)
@@ -243,7 +262,12 @@ if __name__ == "__main__":
     constant2 = Tensor(constant2_data, require_grad=False)
     e = d @ constant2
 
-    fig, ax = visualize(e)
+    f = Tensor(np.array([[2, 3], [1, 7]]), require_grad=True)
+    g = Tensor(np.array([[22, 1], [6, 3]]), require_grad=True)
+    h = f * g + f
+    j = e @ h
 
-    fig.savefig(r"./tests/figs/test2.png")
+    fig, ax = visualize(j)
+
+    fig.savefig(r"./tests/figs/test3.png")
     plt.show()
