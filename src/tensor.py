@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from typing import Callable, TypeAlias
+from typing import TYPE_CHECKING, Callable, TypeAlias
 from uuid import uuid4
 
-import networkx as nx
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
 from .operations import Add, Divide, MatrixMultiply, Multiply, Operation, Subtract
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
+    from numpy.typing import ArrayLike, NDArray
+
 
 Scalar: TypeAlias = int | float
 
@@ -21,8 +26,8 @@ class Tensor:
         grad: The gradient of the tensor.
         require_grad: Indicates whether the tensor requires
             gradient computation.
-        uid: A unique id that represent the tensor.
-        _creator_operation: The operation that create this tensor.
+        uid: A unique id that represents the tensor.
+        _creator_operation: The operation that creates this tensor.
         _backward_fn: The function to compute the gradient backward pass.
             This depends on how the tensor was created.
     """
@@ -143,7 +148,18 @@ class Tensor:
         return MatrixMultiply()(self, other)
 
 
-def visualize(tensor: Tensor):
+def visualize(tensor: Tensor) -> tuple[Figure, Axes]:
+    """
+    Visualizes the computation graph for a given tensor.
+
+    Args:
+        tensor (Tensor): The starting point for building
+            the computation graph.
+
+    Returns:
+        tuple[Figure, Axes]: A tuple containing the matplotlib
+            Figure and Axes objects of the visualization.
+    """
     G = nx.DiGraph()
     visited = set()
     node_labels = {}
@@ -177,8 +193,10 @@ def visualize(tensor: Tensor):
 
     build_computation_graph(tensor)
 
+    # visualization of the computaion graph
     fig, ax = plt.subplots(figsize=(16, 10), dpi=100)
     pos = nx.kamada_kawai_layout(G)
+    # nodes and edges
     nx.draw(
         G,
         pos,
@@ -188,6 +206,7 @@ def visualize(tensor: Tensor):
         arrows=True,
         ax=ax,
     )
+    # node labels
     nx.draw_networkx_labels(
         G,
         pos,
@@ -196,6 +215,7 @@ def visualize(tensor: Tensor):
         font_weight="bold",
         ax=ax,
     )
+    # edge labels
     edge_labels = nx.get_edge_attributes(G, "label")
     nx.draw_networkx_edge_labels(G, pos, edge_labels)
     ax.set_title("Computation Graph")
