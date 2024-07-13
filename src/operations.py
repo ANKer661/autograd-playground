@@ -38,6 +38,14 @@ class Operation(ABC):
         if result.require_grad:
 
             def backward_fn(input_grad: NDArray) -> None:
+                """
+                Computes and propagates gradients through the
+                computational graph.
+
+                Args:
+                    input_grad (NDArray): The gradient flowing back
+                        from subsequent operations in the computational graph.
+                """
                 grads = self.backward(input_grad)
                 for tensor, grad in zip(inputs, grads):
                     if tensor.require_grad:
