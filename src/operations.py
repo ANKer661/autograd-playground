@@ -1,11 +1,14 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 import numpy as np
 from numpy.typing import NDArray
 
 if TYPE_CHECKING:
+    from numpy.typing import NDArray
     from .tensor import Tensor
 
 
@@ -15,9 +18,14 @@ class Operation(ABC):
 
     Attributes:
         inputs: A tuple of input tensors for the operation.
+        uid: A unique id that represents the operation.
     """
 
     inputs: tuple[Tensor, ...]
+    uid: str
+
+    def __init__(self) -> None:
+        self.uid = str(uuid4())
 
     def __call__(self, *inputs: Tensor) -> Tensor:
         """
@@ -139,3 +147,13 @@ class MatrixMultiply(Operation):
     def backward(self, grad: NDArray) -> tuple[NDArray, NDArray]:
         a, b = self.inputs
         return np.matmul(grad, b.data.T), np.matmul(a.data.T, grad)
+
+
+class Transpose(Operation):
+    """The transope operation of the given NDArray."""
+
+    def forward(self, a: NDArray) -> NDArray:
+        return a.T
+
+    def backward(self, grad: NDArray) -> tuple[NDArray]:
+        return (grad.T,)

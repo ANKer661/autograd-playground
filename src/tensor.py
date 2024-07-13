@@ -185,42 +185,45 @@ def visualize(tensor: Tensor) -> tuple[Figure, Axes]:
             inputs = tensor._creator_operation.inputs
             for input_tensor in inputs:
                 build_computation_graph(input_tensor)
-                G.add_edge(
-                    input_tensor.uid,
-                    tensor.uid,
-                    label=tensor._creator_operation.__class__.__name__,
-                )
+
+                op_uid = tensor._creator_operation.uid
+                G.add_node(op_uid)
+                node_labels[op_uid] = str(tensor._creator_operation.__class__.__name__)
+                G.add_edge(op_uid, tensor.uid)
+                G.add_edge(input_tensor.uid, op_uid)
 
     build_computation_graph(tensor)
 
     # visualization of the computaion graph
-    fig, ax = plt.subplots(figsize=(16, 10), dpi=100)
-    pos = nx.kamada_kawai_layout(G)
-    # nodes and edges
+    fig, ax = plt.subplots(figsize=(5, 20), dpi=300)
+    pos = nx.bfs_layout(G.reverse(), tensor.uid, align="horizontal")
+
+    # draw nodes and edges
     nx.draw(
         G,
         pos,
         with_labels=False,
         node_color="lightblue",
-        node_size=5000,
+        node_shape="s",
+        node_size=3000,
         arrows=True,
+        arrowsize=20,
         ax=ax,
     )
-    # node labels
+    # draw node labels
     nx.draw_networkx_labels(
         G,
         pos,
         node_labels,
-        font_size=8,
+        font_size=10,
         font_weight="bold",
         ax=ax,
     )
-    # edge labels
-    edge_labels = nx.get_edge_attributes(G, "label")
-    nx.draw_networkx_edge_labels(G, pos, edge_labels)
-    ax.set_title("Computation Graph")
+
+    ax.set_title("Computation Graph", fontsize=20)
     ax.axis("off")
     ax.margins(0.1, 0.05)
+    ax.autoscale(tight=True, axis="y")
 
     return fig, ax
 
@@ -242,5 +245,5 @@ if __name__ == "__main__":
 
     fig, ax = visualize(e)
 
-    fig.savefig(r"./tests/figs/test.png")
+    fig.savefig(r"./tests/figs/test2.png")
     plt.show()
