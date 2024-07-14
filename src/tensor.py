@@ -4,13 +4,10 @@ from typing import TYPE_CHECKING, Callable, TypeAlias
 from uuid import uuid4
 
 import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
 from .operations import Add, Divide, MatrixMultiply, Multiply, Operation, Subtract
 
 if TYPE_CHECKING:
-    from matplotlib.axes import Axes
-    from matplotlib.figure import Figure
     from numpy.typing import ArrayLike, NDArray
 
 
@@ -148,158 +145,6 @@ class Tensor:
         return MatrixMultiply()(self, other)
 
 
-def visualize(tensor: Tensor) -> tuple[Figure, Axes]:
-    """
-    Visualizes the computation graph for a given tensor.
-
-    Args:
-        tensor (Tensor): The starting point for building
-            the computation graph.
-
-    Returns:
-        tuple[Figure, Axes]: A tuple containing the matplotlib
-            Figure and Axes objects of the visualization.
-    """
-    G = nx.DiGraph()
-    G.graph["flow_direction"] = "forward"
-    visited = set()
-    node_labels = {}
-
-    def build_computation_graph(tensor: Tensor) -> None:
-        """
-        Recursively builds a computation graph starting from the
-        given tensor.
-
-        Args:
-            tensor (Tensor): The starting tensor for building the graph
-        """
-        if tensor.uid in visited:
-            return
-
-        visited.add(tensor.uid)
-        G.add_node(tensor.uid)
-        node_labels[tensor.uid] = str(
-            np.array2string(tensor.data, prefix="  ", separator=", ")
-        )
-
-        if tensor._creator_operation:
-            inputs = tensor._creator_operation.inputs
-            if tensor.grad is not None:
-                G.graph["flow_direction"] = "backward"
-                op = tensor._creator_operation
-                for input_tensor, grad in zip(inputs, op.backward(tensor.grad)):
-                    build_computation_graph(input_tensor)
-
-                    op_uid = tensor._creator_operation.uid
-                    G.add_node(op_uid)
-                    node_labels[op_uid] = str(
-                        tensor._creator_operation.__class__.__name__
-                    )
-
-                    G.add_edge(
-                        op_uid,
-                        tensor.uid,
-                        label=np.array2string(tensor.grad, prefix="  ", separator=", "),
-                    )
-                    G.add_edge(
-                        input_tensor.uid,
-                        op_uid,
-                        label=np.array2string(grad, prefix="  ", separator=", ")
-                        if input_tensor.require_grad
-                        else "not require grad",
-                    )
-            else:
-                for input_tensor in inputs:
-                    build_computation_graph(input_tensor)
-
-                    op_uid = tensor._creator_operation.uid
-                    G.add_node(op_uid)
-                    node_labels[op_uid] = str(
-                        tensor._creator_operation.__class__.__name__
-                    )
-                    G.add_edge(op_uid, tensor.uid)
-                    G.add_edge(input_tensor.uid, op_uid)
-
-    build_computation_graph(tensor)
-
-    # calculate the size of the figure
-    pos_scale = 2 * tensor.data.shape[0]
-    pos: dict = nx.bfs_layout(
-        G.reverse(),
-        tensor.uid,
-        align="horizontal",
-        scale=(pos_scale, 2 * pos_scale),
-    )
-    pos_array = np.array(list(pos.values()))
-    x_min, y_min = pos_array.min(axis=0)
-    x_max, y_max = pos_array.max(axis=0)
-    width = x_max - x_min
-    height = y_max - y_min
-    margin = 0.1
-    fig_width = width + margin
-    fig_height = height + margin
-
-    # create fig and ax, adjust subplot position
-    fig, ax = plt.subplots(figsize=(fig_width * 5, fig_height * 5), dpi=300)
-    plt.subplots_adjust(left=0.02, right=0.98, top=0.95, bottom=0.02)
-
-    # some adaptive parameters
-    node_size = tensor.data.shape[0] * min(
-        5_000, max(1500, 35_000 / (len(G) ** 0.9))
-    )  # 1_500 * tensor.shape[0] < node_size < 5_000 * tensor.shape[0]
-    line_width = node_size / 1500
-    arrowsize = node_size / 250
-    font_size = node_size / 250
-
-    # edge labels (represent the grads flow, if available)
-    edge_labels = {(v, u): attr.get("label", "") for u, v, attr in G.edges(data=True)}
-
-    # draw nodes and edges
-    nx.draw(
-        G.reverse() if G.graph.get("flow_direction") == "backward" else G,
-        pos,
-        with_labels=False,
-        node_color="lightblue",
-        node_shape="s",
-        node_size=node_size,
-        width=line_width,
-        style="--" if G.graph.get("flow_direction") == "backward" else "-",
-        arrows=True,
-        arrowsize=arrowsize,
-        ax=ax,
-    )
-
-    # draw node labels (tensors' data)
-    nx.draw_networkx_labels(
-        G,
-        pos,
-        node_labels,
-        font_size=font_size,
-        font_weight="bold",
-        ax=ax,
-    )
-
-    # draw edge labels (grads flow, if available)
-    edge_labels = {(v, u): attr.get("label", "") for u, v, attr in G.edges(data=True)}
-    grad_font_scale = 1.1
-    nx.draw_networkx_edge_labels(
-        G.reverse(),
-        pos,
-        edge_labels,
-        font_size=font_size / grad_font_scale,
-        font_weight="bold",
-        ax=ax,
-        rotate=False,
-    )
-
-    # set title and margins
-    ax.set_title("Computation Graph", fontsize=2 * font_size, fontweight="bold")
-    ax.axis("off")
-    ax.margins(0.1, 0.05)
-
-    return fig, ax
-
-
 if __name__ == "__main__":
     a_data = np.array([[1, 2, 3], [3, 1, 4]])
     b_data = np.array([[2, 3, 4], [1, 7, 5]])
@@ -319,9 +164,12 @@ if __name__ == "__main__":
     g = Tensor(np.array([[22, 1], [6, 3]]), require_grad=True)
     h = f * g + f
     j = e @ h
+    
 
-    c.backward()
-    fig, ax = visualize(c)
+    j.backward()
+    from .visualization import visualize
 
-    fig.savefig(r"./tests/figs/test4.png")
+    fig, ax = visualize(j)
+
+    fig.savefig(r"./tests/figs/test5.png")
     plt.show()
