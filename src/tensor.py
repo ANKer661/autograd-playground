@@ -1,9 +1,15 @@
 from __future__ import annotations
-from typing import Callable, TypeAlias
 
+from typing import TYPE_CHECKING, Callable, TypeAlias
+from uuid import uuid4
+
+import matplotlib.pyplot as plt
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
-from .operations import Add, Divide, MatrixMultiply, Multiply, Subtract
+from .operations import Add, Divide, MatrixMultiply, Multiply, Operation, Subtract
+
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike, NDArray
+
 
 Scalar: TypeAlias = int | float
 
@@ -17,13 +23,17 @@ class Tensor:
         grad: The gradient of the tensor.
         require_grad: Indicates whether the tensor requires
             gradient computation.
+        uid: A unique id that represents the tensor.
+        _creator_operation: The operation that creates this tensor.
         _backward_fn: The function to compute the gradient backward pass.
             This depends on how the tensor was created.
     """
 
     data: NDArray
     grad: ArrayLike | None
+    uid: str
     require_grad: bool
+    _creator_operation: Operation | None
     _backward_fn: Callable[[ArrayLike], None] | None
 
     def __init__(self, data: ArrayLike, require_grad=False) -> None:
@@ -37,7 +47,9 @@ class Tensor:
         """
         self.data = np.array(data)
         self.grad = None
+        self.uid = str(uuid4())
         self.require_grad = require_grad
+        self._creator_operation = None
         self._backward_fn = None
 
     def backward(self, grad: ArrayLike | None = None) -> None:
@@ -131,3 +143,33 @@ class Tensor:
             other (Tensor): another Tensor as right operand
         """
         return MatrixMultiply()(self, other)
+
+
+if __name__ == "__main__":
+    a_data = np.array([[1, 2, 3], [3, 1, 4]])
+    b_data = np.array([[2, 3, 4], [1, 7, 5]])
+    a = Tensor(a_data, require_grad=True)
+    b = Tensor(b_data, require_grad=True)
+    c = 3 * a + b
+
+    constant1_data = np.array([2, 3, 4])  # broadcast: (3,) -> (2, 3)
+    constant1 = Tensor(constant1_data, require_grad=False)
+    d = c * constant1
+
+    constant2_data = np.array([[2, 2], [3, 9], [4, 7]])
+    constant2 = Tensor(constant2_data, require_grad=False)
+    e = d @ constant2
+
+    f = Tensor(np.array([[2, 3], [1, 7]]), require_grad=True)
+    g = Tensor(np.array([[22, 1], [6, 3]]), require_grad=True)
+    h = f * g + f
+    j = e @ h
+    
+
+    j.backward()
+    from .visualization import visualize
+
+    fig, ax = visualize(j)
+
+    fig.savefig(r"./tests/figs/test5.png")
+    plt.show()

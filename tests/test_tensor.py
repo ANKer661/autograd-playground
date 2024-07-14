@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from src.operations import Add, Divide, MatrixMultiply, Multiply, Subtract
 from src.tensor import Tensor
 
 
@@ -11,12 +12,14 @@ class TestTensor(unittest.TestCase):
         self.assertFalse(t.require_grad)
         self.assertIsNone(t.grad)
         self.assertIsNone(t._backward_fn)
+        self.assertIsNone(t._creator_operation)
 
         t = Tensor([1, 2, 3], require_grad=True)
         self.assertTrue(np.array_equal(t.data, np.array([1, 2, 3])))
         self.assertTrue(t.require_grad)
         self.assertIsNone(t.grad)
         self.assertIsNone(t._backward_fn)
+        self.assertIsNone(t._creator_operation)
 
     def test_tensor_backward(self):
         t = Tensor([1, 2, 3], require_grad=True)
@@ -31,6 +34,7 @@ class TestTensor(unittest.TestCase):
         self.assertTrue(res.require_grad)
         self.assertIsNone(res.grad)
         self.assertIsNotNone(res._backward_fn)
+        self.assertIsInstance(res._creator_operation, Add)
 
         # test tensor+scalar & commutative property
         t3 = Tensor([1, 2, 3], require_grad=True)
@@ -45,6 +49,7 @@ class TestTensor(unittest.TestCase):
         self.assertTrue(res.require_grad)
         self.assertIsNone(res.grad)
         self.assertIsNotNone(res._backward_fn)
+        self.assertIsInstance(res._creator_operation, Subtract)
 
     def test_multiply(self):
         # test tenser * tensor
@@ -55,6 +60,7 @@ class TestTensor(unittest.TestCase):
         self.assertTrue(res.require_grad)
         self.assertIsNone(res.grad)
         self.assertIsNotNone(res._backward_fn)
+        self.assertIsInstance(res._creator_operation, Multiply)
 
         # test scalar*tensor & commutative property
         t3 = Tensor([1, 2, 3], require_grad=True)
@@ -70,6 +76,7 @@ class TestTensor(unittest.TestCase):
         self.assertTrue(res.require_grad)
         self.assertIsNone(res.grad)
         self.assertIsNotNone(res._backward_fn)
+        self.assertIsInstance(res._creator_operation, Divide)
 
         # test divided by 0
         t3 = Tensor([1, 3, 1], require_grad=True)
@@ -92,6 +99,7 @@ class TestTensor(unittest.TestCase):
         self.assertTrue(res.require_grad)
         self.assertIsNone(res.grad)
         self.assertIsNotNone(res._backward_fn)
+        self.assertIsInstance(res._creator_operation, MatrixMultiply)
 
         res = t2 @ t1
         self.assertTrue(np.array_equal(res.data, np.matmul(d2, d1)))
